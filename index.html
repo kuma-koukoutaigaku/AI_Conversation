@@ -2,21 +2,25 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>VS Alex - 確信版</title>
+    <title>VS Alex - 起動フェーズ</title>
     <style>
         body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; padding-top: 50px; }
-        #alex-box { background: #333; width: 80%; max-width: 500px; margin: 0 auto; padding: 20px; border-radius: 15px; border: 2px solid #555; }
-        #alex-text { font-size: 1.2rem; min-height: 50px; margin-bottom: 20px; }
-        .mic-btn { width: 80px; height: 80px; border-radius: 50%; border: none; background: #d32f2f; color: white; font-size: 2rem; cursor: pointer; }
-        .mic-btn.listening { background: #4caf50; box-shadow: 0 0 20px #4caf50; }
+        #alex-box { background: #2a2a2a; width: 85%; max-width: 500px; margin: 0 auto; padding: 30px; border-radius: 20px; border: 2px solid #444; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #alex-text { font-size: 1.4rem; font-weight: bold; min-height: 60px; margin-bottom: 10px; color: #fff; }
+        #translation { color: #888; font-size: 1rem; margin-bottom: 30px; min-height: 24px; }
+        .mic-btn { width: 90px; height: 90px; border-radius: 50%; border: none; background: #e53935; color: white; font-size: 2.2rem; cursor: pointer; transition: 0.3s; }
+        .mic-btn.listening { background: #43a047; box-shadow: 0 0 20px #43a047; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        #status { margin-top: 20px; font-size: 0.8rem; color: #666; }
     </style>
 </head>
 <body>
 
     <div id="alex-box">
-        <div id="alex-text">Talk to me... (サイトで動いたなら、ここでも動くはずだ)</div>
-        <div id="translation" style="color: #999; font-size: 0.9rem;"></div>
+        <div id="alex-text">Ready for you.</div>
+        <div id="translation">準備はいいか。</div>
         <button id="mic-btn" class="mic-btn">🎤</button>
+        <div id="status">ボタンを押して英語で話せ</div>
     </div>
 
     <script type="importmap">
@@ -30,15 +34,15 @@
     <script type="module">
         import { GoogleGenerativeAI } from "@google/generative-ai";
 
-        // 君のキー
-        const API_KEY = "AIzaSyBxOpLgJlbu5_uRTBhZL1gLdv1AjyNgkOI";
+        // 君が新しく作った最強のキー
+        const API_KEY = "AIzaSyBsb4sW9ox5UCFmxRDZDn-A9sjBTvZ1w_I";
         const genAI = new GoogleGenerativeAI(API_KEY);
-        // 最新の安定モデルを指定
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         const micBtn = document.getElementById('mic-btn');
         const alexText = document.getElementById('alex-text');
         const translationDiv = document.getElementById('translation');
+        const statusDiv = document.getElementById('status');
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
@@ -47,31 +51,41 @@
         micBtn.onclick = () => {
             recognition.start();
             micBtn.classList.add('listening');
+            statusDiv.innerText = "Listening...";
         };
 
         recognition.onresult = async (event) => {
             micBtn.classList.remove('listening');
             const userText = event.results[0][0].transcript;
+            statusDiv.innerText = "You said: " + userText;
             alexText.innerText = "Thinking...";
 
             try {
-                // 公式ライブラリを使って送信
-                const prompt = `あなたは厳しい上司Alexです。短く英語で返答し、最後に「日本語訳：〜〜」とつけて。: ${userText}`;
+                // Alexの性格設定を込めて送信
+                const prompt = `あなたは超厳しい上司のAlexです。部下の英語が下手だと怒ります。短く英語で1文で返答し、最後に「日本語訳：〜〜」とつけて。: ${userText}`;
+                
                 const result = await model.generateContent(prompt);
                 const response = await result.response;
                 const text = response.text();
 
+                // 英語と日本語を分ける
                 const parts = text.split('日本語訳：');
-                alexText.innerText = parts[0];
-                translationDiv.innerText = parts[1] ? "（" + parts[1] + "）" : "";
+                const english = parts[0].trim();
+                const japanese = parts[1] ? parts[1].trim() : "";
 
-                // 音読
-                const uttr = new SpeechSynthesisUtterance(parts[0]);
+                alexText.innerText = english;
+                translationDiv.innerText = japanese;
+
+                // 声で喋らせる
+                const uttr = new SpeechSynthesisUtterance(english);
                 uttr.lang = 'en-US';
+                uttr.rate = 0.9; // 少しゆっくり、威圧的に
                 window.speechSynthesis.speak(uttr);
 
             } catch (e) {
-                alexText.innerText = "エラー: " + e.message;
+                console.error(e);
+                alexText.innerText = "Error...";
+                translationDiv.innerText = "まだキーが反映されてないか、通信エラーだ。";
             }
         };
     </script>
