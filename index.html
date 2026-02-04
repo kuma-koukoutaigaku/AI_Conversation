@@ -34,8 +34,8 @@
         const API_KEY = "AIzaSyBsb4sW9ox5UCFmxRDZDn-A9sjBTvZ1w_I";
         const genAI = new GoogleGenerativeAI(API_KEY);
         
-        // 【重要修正】モデル名を "gemini-1.5-flash" から "gemini-1.5-flash-latest" に変更
-        // これで 404 エラー（見つからない）を回避する。
+        // 【ここが修正ポイント！】
+        // 末尾に "-latest" を追加。これで404エラーが出なくなる。
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
         const micBtn = document.getElementById('mic-btn');
@@ -43,16 +43,19 @@
         const translationDiv = document.getElementById('translation');
         const statusDiv = document.getElementById('status');
 
+        // 音声認識（ブラウザの耳）の準備
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
         recognition.lang = 'en-US';
 
+        // マイクボタンを押した時の動き
         micBtn.onclick = () => {
             recognition.start();
             micBtn.classList.add('listening');
             statusDiv.innerText = "Listening...";
         }
 
+        // 英語を話し終わった後の動き
         recognition.onresult = async (event) => {
             micBtn.classList.remove('listening');
             const userText = event.results[0][0].transcript;
@@ -60,15 +63,15 @@
             alexText.innerText = "Thinking...";
 
             try {
-                // AIに送る命令（プロンプト）
+                // Alexへの命令文
                 const prompt = `あなたは超厳しい上司のAlexです。部下の英語が下手だと怒ります。短く英語で1文で返答し、最後に「日本語訳：〜〜」とつけて。: ${userText}`;
                 
-                // 通信開始
+                // AIに送信して結果を待つ
                 const result = await model.generateContent(prompt);
                 const response = await result.response;
                 const text = response.text();
 
-                // 英語と日本語に分ける
+                // 返答を英語と日本語に切り分ける
                 const parts = text.split('日本語訳：');
                 const english = parts[0].trim();
                 const japanese = parts[1] ? parts[1].trim() : "";
@@ -76,14 +79,13 @@
                 alexText.innerText = english;
                 translationDiv.innerText = japanese;
 
-                // 喋らせる
+                // Alexの声で喋らせる
                 const uttr = new SpeechSynthesisUtterance(english);
                 uttr.lang = 'en-US';
                 window.speechSynthesis.speak(uttr);
 
             } catch (e) {
                 console.error(e);
-                // エラーが出た場合、その内容を画面にも出すようにした
                 alexText.innerText = "Error...";
                 translationDiv.innerText = "エラー詳細: " + e.message;
             }
