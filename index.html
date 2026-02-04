@@ -2,74 +2,96 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>診断モード</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VS Alex - 最終決戦</title>
     <style>
-        body { background: #222; color: #fff; font-family: sans-serif; text-align: center; padding: 50px; }
-        #status { color: #ffeb3b; margin-bottom: 20px; }
-        #error-log { background: #000; color: #ff5252; padding: 20px; border-radius: 10px; margin-top: 20px; font-family: monospace; text-align: left; display: none; }
-        button { padding: 15px 30px; font-size: 1.2rem; cursor: pointer; }
+        body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center;
+               background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80');
+               background-size: cover; background-position: center; color: white; }
+        #app-container { width: 90%; max-width: 500px; text-align: center; background: rgba(0,0,0,0.8); padding: 40px; border-radius: 30px; border: 1px solid #444; }
+        #alex-message { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; min-height: 60px; color: #fff; }
+        #translation { font-size: 1rem; color: #aaa; margin-bottom: 30px; min-height: 20px; }
+        .mic-btn { width: 90px; height: 90px; border-radius: 50%; border: none; background: #d32f2f; color: white; font-size: 2rem; cursor: pointer; transition: 0.3s; }
+        .mic-btn.listening { background: #4caf50; box-shadow: 0 0 20px #4caf50; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        #user-speech { margin-top: 20px; color: #03a9f4; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
-    <h2>Alex 接続テスト</h2>
-    <div id="status">ボタンを押して「Hello」と話してみて</div>
-    
-    <button id="test-btn">🎤 テスト開始</button>
-    
-    <div id="error-log" id="log-box">
-        <strong>【エラー詳細】</strong><br>
-        <span id="log-text"></span>
-    </div>
+<div id="app-container">
+    <div id="alex-message">Wait... checking connection...</div>
+    <div id="translation"></div>
+    <button id="mic-btn" class="mic-btn">🎤</button>
+    <div id="user-speech"></div>
+</div>
 
 <script>
+    // ここを最新の正しいモデル名に修正したよ！
     const API_KEY = 'AIzaSyBxOpLgJlbu5_uRTBhZL1gLdv1AjyNgkOI';
+    const MODEL_NAME = 'gemini-1.5-flash-latest'; // ここが修正ポイント
 
-    const btn = document.getElementById('test-btn');
-    const status = document.getElementById('status');
-    const logBox = document.getElementById('error-log');
-    const logText = document.getElementById('log-text');
+    const micBtn = document.getElementById('mic-btn');
+    const alexMessage = document.getElementById('alex-message');
+    const translationDiv = document.getElementById('translation');
+    const userSpeechDiv = document.getElementById('user-speech');
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition ? new SpeechRecognition() : null;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
 
-    if (!recognition) {
-        status.innerText = "ブラウザが音声認識に対応してないよ。Chromeで開いてる？";
-    }
-
-    btn.onclick = () => {
+    micBtn.onclick = () => {
         recognition.start();
-        status.innerText = "聞き取り中...";
+        micBtn.classList.add('listening');
+        userSpeechDiv.innerText = "Listening...";
     };
 
-    recognition.onresult = async (event) => {
-        const text = event.results[0][0].transcript;
-        status.innerText = "通信中...";
+    recognition.onresult = (event) => {
+        micBtn.classList.remove('listening');
+        const transcript = event.results[0][0].transcript;
+        userSpeechDiv.innerText = "You: " + transcript;
+        chatWithAlex(transcript);
+    };
+
+    async function chatWithAlex(text) {
+        alexMessage.innerText = "Alex is typing...";
         
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+            // URLを最新の正式版に変更
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
+            
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: text }] }] })
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: `あなたは厳しい上司Alexです。英語で1〜2文、厳しく短く返答し、最後に必ず「日本語訳：〜〜」とつけて。 "${text}"` }] }]
+                })
             });
 
             const data = await response.json();
+            const fullReply = data.candidates[0].content.parts[0].text;
+            
+            const parts = fullReply.split('日本語訳：');
+            const english = parts[0].trim();
+            const japanese = parts[1] ? parts[1].trim() : "";
 
-            if (response.ok) {
-                status.innerText = "✅ 成功！Alexの返答: " + data.candidates[0].content.parts[0].text;
-                logBox.style.display = "none";
-            } else {
-                // ここでエラーの正体を暴く
-                status.innerText = "❌ 通信エラー発生";
-                logBox.style.display = "block";
-                logText.innerText = JSON.stringify(data.error, null, 2);
-            }
+            alexMessage.innerText = english;
+            translationDiv.innerText = japanese;
+
+            // 音読
+            const uttr = new SpeechSynthesisUtterance(english);
+            uttr.lang = 'en-US';
+            speechSynthesis.speak(uttr);
+
         } catch (e) {
-            status.innerText = "❌ 接続自体に失敗";
-            logBox.style.display = "block";
-            logText.innerText = e.message;
+            alexMessage.innerText = "まだエラーが出るね。Google側の反映待ちかも。";
+            console.error(e);
         }
-    };
+    }
+
+    // 起動時に一瞬喋らせてみる
+    window.onload = () => { alexMessage.innerText = "Talk to me. Now."; translationDiv.innerText = "話せ、今すぐだ。"; };
 </script>
+
 </body>
 </html>
