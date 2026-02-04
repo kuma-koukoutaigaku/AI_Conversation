@@ -2,16 +2,70 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>VS Alex - 起動フェーズ</title>
+    <title>VS Alex - 英語特訓</title>
+
     <style>
-        body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; padding-top: 50px; }
-        #alex-box { background: #2a2a2a; width: 85%; max-width: 500px; margin: 0 auto; padding: 30px; border-radius: 20px; border: 2px solid #444; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        #alex-text { font-size: 1.4rem; font-weight: bold; min-height: 60px; margin-bottom: 10px; color: #fff; }
-        #translation { color: #888; font-size: 1rem; margin-bottom: 30px; min-height: 24px; }
-        .mic-btn { width: 90px; height: 90px; border-radius: 50%; border: none; background: #e53935; color: white; font-size: 2.2rem; cursor: pointer; transition: 0.3s; }
-        .mic-btn.listening { background: #43a047; box-shadow: 0 0 20px #43a047; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-        #status { margin-top: 20px; font-size: 0.8rem; color: #666; }
+        /* 画面全体の背景と文字の色 */
+        body { 
+            background: #1a1a1a; 
+            color: white; 
+            font-family: 'Helvetica', sans-serif; 
+            text-align: center; 
+            padding-top: 50px; 
+        }
+
+        /* Alexとの会話を表示するメインの箱（枠） */
+        #alex-box { 
+            background: #2a2a2a; 
+            width: 85%; 
+            max-width: 500px; 
+            margin: 0 auto; 
+            padding: 30px; 
+            border-radius: 20px; 
+            border: 2px solid #444; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+        }
+
+        /* Alexが喋った英語を表示する場所 */
+        #alex-text { 
+            font-size: 1.4rem; 
+            font-weight: bold; 
+            min-height: 60px; 
+            margin-bottom: 10px; 
+        }
+
+        /* 日本語訳を表示する少し薄い色の場所 */
+        #translation { 
+            color: #888; 
+            font-size: 1rem; 
+            margin-bottom: 30px; 
+        }
+
+        /* マイクボタンのデザイン */
+        .mic-btn { 
+            width: 90px; height: 90px; 
+            border-radius: 50%; 
+            border: none; 
+            background: #e53935; 
+            color: white; 
+            font-size: 2.2rem; 
+            cursor: pointer; 
+            transition: 0.3s; 
+        }
+
+        /* 録音中（listening状態）の時にボタンを緑にして光らせる設定 */
+        .mic-btn.listening { 
+            background: #43a047; 
+            box-shadow: 0 0 20px #43a047; 
+            animation: pulse 1s infinite; 
+        }
+
+        /* ボタンがポワンポワンと動くアニメーション */
+        @keyframes pulse { 
+            0% { transform: scale(1); } 
+            50% { transform: scale(1.05); } 
+            100% { transform: scale(1); } 
+        }
     </style>
 </head>
 <body>
@@ -19,73 +73,82 @@
     <div id="alex-box">
         <div id="alex-text">Ready for you.</div>
         <div id="translation">準備はいいか。</div>
+        
         <button id="mic-btn" class="mic-btn">🎤</button>
-        <div id="status">ボタンを押して英語で話せ</div>
+        
+        <div id="status" style="margin-top:20px; color:#666;">ボタンを押して英語で話せ</div>
     </div>
 
     <script type="importmap">
-      {
-        "imports": {
-          "@google/generative-ai": "https://esm.run/@google/generative-ai"
-        }
-      }
+      { "imports": { "@google/generative-ai": "https://esm.run/@google/generative-ai" } }
     </script>
 
     <script type="module">
         import { GoogleGenerativeAI } from "@google/generative-ai";
 
-        // 君が新しく作った最強のキー
+        // --- (A) AIの初期設定 ---
         const API_KEY = "AIzaSyBsb4sW9ox5UCFmxRDZDn-A9sjBTvZ1w_I";
         const genAI = new GoogleGenerativeAI(API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        
+        // ここを「gemini-1.5-flash-latest」に変更！
+        // これが最新の「どこからでも繋がる」正式な名前だ。
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
+        // --- (B) 各パーツをプログラムでいじれるように名前をつける ---
         const micBtn = document.getElementById('mic-btn');
         const alexText = document.getElementById('alex-text');
         const translationDiv = document.getElementById('translation');
         const statusDiv = document.getElementById('status');
 
+        // --- (C) 音声認識（ブラウザの耳）の準備 ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
+        recognition.lang = 'en-US'; // 英語を聞き取るように設定
 
+        // --- (D) マイクボタンが押された時の動き ---
         micBtn.onclick = () => {
-            recognition.start();
-            micBtn.classList.add('listening');
+            recognition.start(); // 聞き取り開始
+            micBtn.classList.add('listening'); // 見た目を緑にして光らせる
             statusDiv.innerText = "Listening...";
-        };
+        }
 
+        // --- (E) 英語を話し終わった瞬間に実行される処理 ---
         recognition.onresult = async (event) => {
-            micBtn.classList.remove('listening');
-            const userText = event.results[0][0].transcript;
+            micBtn.classList.remove('listening'); // ボタンの色を戻す
+            const userText = event.results[0][0].transcript; // 今君が喋った英語を文字にする
             statusDiv.innerText = "You said: " + userText;
             alexText.innerText = "Thinking...";
 
             try {
-                // Alexの性格設定を込めて送信
+                // 【AIへのリクエスト】
+                // ここで「Alex」の性格をプロンプト（命令文）で指定している
                 const prompt = `あなたは超厳しい上司のAlexです。部下の英語が下手だと怒ります。短く英語で1文で返答し、最後に「日本語訳：〜〜」とつけて。: ${userText}`;
                 
                 const result = await model.generateContent(prompt);
                 const response = await result.response;
                 const text = response.text();
 
-                // 英語と日本語を分ける
+                // 【返ってきた返答を分割】
+                // 「日本語訳：」という文字を境目に、英語と日本語に分ける
                 const parts = text.split('日本語訳：');
                 const english = parts[0].trim();
                 const japanese = parts[1] ? parts[1].trim() : "";
 
+                // 画面に表示
                 alexText.innerText = english;
                 translationDiv.innerText = japanese;
 
-                // 声で喋らせる
+                // 【声を出す】
+                // ブラウザの読み上げ機能（音声合成）を使って英語を喋らせる
                 const uttr = new SpeechSynthesisUtterance(english);
                 uttr.lang = 'en-US';
-                uttr.rate = 0.9; // 少しゆっくり、威圧的に
                 window.speechSynthesis.speak(uttr);
 
             } catch (e) {
+                // 何かエラーが起きたらここに飛んでくる
                 console.error(e);
                 alexText.innerText = "Error...";
-                translationDiv.innerText = "まだキーが反映されてないか、通信エラーだ。";
+                translationDiv.innerText = "通信エラーか、キーの問題だ。";
             }
         };
     </script>
