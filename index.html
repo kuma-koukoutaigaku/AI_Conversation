@@ -3,51 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>脱・Sorry！AIロールプレイング</title>
+    <title>VS Alex - 脱・Sorry！</title>
     <style>
-        body { font-family: sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 20px; }
-        #chat-container { width: 100%; max-width: 500px; background: white; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); overflow: hidden; }
-        #chat-box { height: 400px; overflow-y: auto; padding: 20px; border-bottom: 1px solid #ddd; display: flex; flex-direction: column; }
-        .message { margin-bottom: 15px; line-height: 1.5; padding: 10px; border-radius: 8px; max-width: 80%; }
-        .alex { background: #ffebee; color: #d32f2f; align-self: flex-start; border: 1px solid #ffcdd2; }
-        .user { background: #e3f2fd; color: #1976d2; align-self: flex-end; border: 1px solid #bbdefb; }
-        .input-area { display: flex; padding: 10px; }
-        input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; outline: none; }
-        button { padding: 10px 20px; background: #333; color: white; border: none; border-radius: 5px; margin-left: 5px; cursor: pointer; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
+        body { margin: 0; font-family: 'Helvetica Neue', sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center;
+               /* オフィス背景をセット */
+               background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80');
+               background-size: cover; background-position: center; color: white; overflow: hidden; }
+        
+        #app-container { width: 90%; max-width: 500px; text-align: center; background: rgba(255,255,255,0.1); padding: 40px; border-radius: 30px; backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        
+        #alex-status { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; color: #ff5252; margin-bottom: 10px; }
+        
+        #alex-message { font-size: 1.6rem; font-weight: bold; margin-bottom: 15px; min-height: 80px; line-height: 1.2; color: #fff; }
+        
+        #translation { font-size: 1rem; color: #bbb; margin-bottom: 40px; font-style: italic; }
+        
+        .mic-btn { width: 100px; height: 100px; border-radius: 50%; border: none; background: #d32f2f; color: white; font-size: 2.5rem; cursor: pointer; transition: 0.3s; box-shadow: 0 0 15px rgba(211,47,47,0.4); }
+        .mic-btn:hover { transform: scale(1.05); background: #f44336; }
+        .mic-btn.listening { background: #4caf50; box-shadow: 0 0 30px #4caf50; animation: pulse 1.5s infinite; }
+        
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        
+        #user-speech { margin-top: 30px; font-size: 0.9rem; color: #03a9f4; min-height: 20px; }
+        .hint { margin-top: 15px; font-size: 0.8rem; color: #ffeb3b; background: rgba(255,235,59,0.1); padding: 5px 10px; border-radius: 5px; display: inline-block; }
     </style>
 </head>
 <body>
 
-<div id="chat-container">
-    <div style="background: #333; color: white; padding: 15px; text-align: center; font-weight: bold;">
-        VS Alex (厳しい上司)
-    </div>
-    <div id="chat-box">
-        <div class="message alex">Alex: Hey, I've been waiting for that updated report for over an hour. What's the hold-up?</div>
-    </div>
-    <div class="input-area">
-        <input type="text" id="user-input" placeholder="Sorryを使わずに返信..." onkeypress="if(event.key==='Enter') sendMessage()">
-        <button id="send-btn" onclick="sendMessage()">送信</button>
-    </div>
+<div id="app-container">
+    <div id="alex-status">Boss Alex is watching you</div>
+    <div id="alex-message">Talk to me. Now.</div>
+    <div id="translation">(話しかけてこい、今すぐだ)</div>
+    
+    <button id="mic-btn" class="mic-btn">🎤</button>
+    <div id="user-speech"></div>
+    <div id="hint-area"></div>
 </div>
 
 <script>
-    // 君のキーを直接埋め込んだよ。
-    const API_KEY = 'AIzaSyCvPaPcBQRsUi-kWyVTMcRwkkmQ6xPOzZI';
+    // 新しいキーをセット済み
+    const API_KEY = 'AIzaSyBxOpLgJlbu5_uRTBhZL1gLdv1AjyNgkOI';
 
-    async function sendMessage() {
-        const inputField = document.getElementById('user-input');
-        const sendBtn = document.getElementById('send-btn');
-        const userText = inputField.value;
+    const micBtn = document.getElementById('mic-btn');
+    const alexMessage = document.getElementById('alex-message');
+    const translationDiv = document.getElementById('translation');
+    const userSpeechDiv = document.getElementById('user-speech');
+    const hintArea = document.getElementById('hint-area');
 
-        if (!userText) return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("お使いのブラウザは音声認識に対応していません。Chromeを使ってみてね！");
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
 
-        // 二重送信防止
-        sendBtn.disabled = true;
-        appendMessage('You', userText, 'user');
-        inputField.value = '';
+    micBtn.onclick = () => {
+        recognition.start();
+        micBtn.classList.add('listening');
+        userSpeechDiv.innerText = "Listening...";
+    };
 
+    recognition.onresult = (event) => {
+        micBtn.classList.remove('listening');
+        const transcript = event.results[0][0].transcript;
+        userSpeechDiv.innerText = "You: " + transcript;
+        chatWithAlex(transcript);
+    };
+
+    recognition.onerror = () => {
+        micBtn.classList.remove('listening');
+        userSpeechDiv.innerText = "Error: 音声が聞き取れなかったよ。";
+    };
+
+    async function chatWithAlex(text) {
+        alexMessage.innerText = "...";
+        translationDiv.innerText = "";
+        
         try {
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
                 method: 'POST',
@@ -55,41 +86,39 @@
                 body: JSON.stringify({
                     contents: [{
                         parts: [{ text: `あなたは厳しい上司Alexです。
-                        ユーザーの今の発言: "${userText}"
-                        状況: ユーザーは仕事が遅れているとあなたに怒られています。
-                        目標フレーズ: My bad. / Thanks for waiting. / Noted. / No biggie. / Let me check.
+                        ユーザーの今の発言: "${text}"
                         
-                        ルール: 
-                        1. 英語で1〜2文、少し威圧的に返信してください。
-                        2. ユーザーが "Sorry" を使ったら、「謝らなくていい。具体的にどうするのか教えろ」と厳しく指摘してください。
-                        3. 返信の最後に、日本語で1行だけ「💡アドバイス」を添えてください。` }]
+                        【ルール】
+                        1. 英語で1〜2文、厳しく短く返答。
+                        2. 返答の最後に必ず「日本語訳：〜〜」とつけてください。
+                        3. 最後に「💡ヒント：〜〜」という形式で、My bad./Thanks for waiting./Noted./No biggie./Let me check.のどれかを使うようアドバイスして。
+                        4. ユーザーが "Sorry" を使ったら激怒して。` }]
                     }]
                 })
             });
 
             const data = await response.json();
+            const fullReply = data.candidates[0].content.parts[0].text;
             
-            if (data.candidates && data.candidates[0].content) {
-                const alexReply = data.candidates[0].content.parts[0].text;
-                appendMessage('Alex', alexReply, 'alex');
-            } else {
-                console.error(data);
-                appendMessage('Alex', 'エラー：AIがうまく返事できなかったみたい。', 'alex');
-            }
-        } catch (error) {
-            console.error(error);
-            appendMessage('Error', '接続に失敗。ネットかキーの問題かも。', 'alex');
-        } finally {
-            sendBtn.disabled = false;
-        }
-    }
+            // テキストを分割して表示
+            const parts = fullReply.split('\n');
+            const english = parts[0];
+            const translation = parts.find(p => p.includes('日本語訳')) || "";
+            const hint = parts.find(p => p.includes('💡')) || "";
 
-    function appendMessage(sender, text, className) {
-        const div = document.createElement('div');
-        div.className = `message ${className}`;
-        div.innerHTML = `<strong>${sender}:</strong><br>${text}`;
-        chatBox.appendChild(div);
-        chatBox.scrollTop = chatBox.scrollHeight;
+            alexMessage.innerText = english;
+            translationDiv.innerText = translation.replace('日本語訳：', '');
+            hintArea.innerHTML = hint ? `<span class="hint">${hint}</span>` : "";
+
+            // ネイティブ音読
+            const uttr = new SpeechSynthesisUtterance(english);
+            uttr.lang = 'en-US';
+            uttr.rate = 1.0;
+            speechSynthesis.speak(uttr);
+
+        } catch (e) {
+            alexMessage.innerText = "Error: まだキーが通らないみたい。5分待ってリフレッシュして！";
+        }
     }
 </script>
 
